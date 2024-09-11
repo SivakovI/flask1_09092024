@@ -45,6 +45,14 @@ quotes = [
 ]
 
 
+def get_quote_by_id(id):
+    for index, quote in enumerate(quotes):
+        if quote["id"] == id:
+            return quote, index
+
+    return None, None
+
+
 @app.route("/")
 def hello_world():
     return "Hello, World!"
@@ -70,10 +78,39 @@ def add_quote():
 
 @app.route("/quotes/<int:id>")
 def get_quote(id):
-    for quote in quotes:
-        if quote["id"] == id:
-            return quote
-    return f"Quote with id {id} not found", HTTPStatus.NOT_FOUND
+    quote, _ = get_quote_by_id(id)
+    if quote is None:
+        return f"Quote with id {id} not found", HTTPStatus.NOT_FOUND
+
+    return quote, HTTPStatus.OK
+
+
+@app.route("/quotes/<int:id>", methods=["PUT"])
+def edit_quote(id):
+    quote, index = get_quote_by_id(id)
+    if quote is None:
+        return f"Quote with id {id} not found", HTTPStatus.NOT_FOUND
+
+    new_data = request.json
+
+    for key, value in new_data.items():
+        if key not in quote:
+            return f"Invalid key {key}", HTTPStatus.BAD_REQUEST
+        quote[key] = value
+
+    quotes[index] = quote
+
+    return quote, HTTPStatus.OK
+
+
+@app.route("/quotes/<int:id>", methods=["DELETE"])
+def delete_quote(id):
+    quote, index = get_quote_by_id(id)
+    if quote is None:
+        return f"Quote with id {id} not found", HTTPStatus.NOT_FOUND
+
+    del quotes[index]
+    return f"Quote with id {id} deleted", HTTPStatus.OK
 
 
 @app.route("/quotes/count")
