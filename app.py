@@ -44,6 +44,18 @@ quotes = [
     },
 ]
 
+DEFAULT_RATING = 1
+MAX_RATING = 5
+
+
+def lazy_add_ratings():
+    for quote in quotes:
+        quote["rating"] = DEFAULT_RATING
+
+
+def validate_rating(rating):
+    return 1 <= rating <= MAX_RATING
+
 
 def get_quote_by_id(id):
     for index, quote in enumerate(quotes):
@@ -68,9 +80,27 @@ def get_quotes():
     return quotes
 
 
+@app.route("/quotes/filter")
+def filter_quotes():
+    filtered_quotes = quotes.copy()
+    for key, value in request.args.items():
+        if key not in ["author", "rating"]:
+            return f"Invalid key {key}", HTTPStatus.BAD_REQUEST
+        if key == "rating":
+            value = int(value)
+        filtered_quotes = [
+            quote
+            for quote in filtered_quotes
+            if quote[key] == value
+        ]
+    return filtered_quotes
+
+
 @app.route("/quotes", methods=["POST"])
 def add_quote():
     quote = request.json
+    if "rating" not in quote or not validate_rating(quote["rating"]):
+        quote["rating"] = DEFAULT_RATING
     quote["id"] = quotes[-1]["id"] + 1
     quotes.append(quote)
     return quote, HTTPStatus.CREATED
@@ -82,7 +112,7 @@ def get_quote(id):
     if quote is None:
         return f"Quote with id {id} not found", HTTPStatus.NOT_FOUND
 
-    return quote, HTTPStatus.OK
+    return quote
 
 
 @app.route("/quotes/<int:id>", methods=["PUT"])
@@ -94,16 +124,20 @@ def edit_quote(id):
     new_data = request.json
 
     for key, value in new_data.items():
+
         if key not in quote:
             return f"Invalid key {key}", HTTPStatus.BAD_REQUEST
         if key == "id":
             return "Id is read-only", HTTPStatus.BAD_REQUEST
+        # если рейтинг не валидный, пропускаем запись в словарь quote
+        if key == "rating" and not validate_rating(value):
+            continue
 
         quote[key] = value
 
     quotes[index] = quote
 
-    return quote, HTTPStatus.OK
+    return quote
 
 
 @app.route("/quotes/<int:id>", methods=["DELETE"])
@@ -113,7 +147,7 @@ def delete_quote(id):
         return f"Quote with id {id} not found", HTTPStatus.NOT_FOUND
 
     del quotes[index]
-    return f"Quote with id {id} deleted", HTTPStatus.OK
+    return f"Quote with id {id} deleted"
 
 
 @app.route("/quotes/count")
@@ -127,4 +161,5 @@ def get_random_quote():
 
 
 if __name__ == "__main__":
+    lazy_add_ratings()
     app.run(debug=True)
