@@ -1,7 +1,7 @@
 from http import HTTPStatus
 from random import choice
 
-from flask import Flask
+from flask import Flask, request
 
 app = Flask(__name__)
 
@@ -58,6 +58,14 @@ def about():
 @app.route("/quotes")
 def get_quotes():
     return quotes
+
+
+@app.route("/quotes", methods=["POST"])
+def add_quote():
+    quote = request.json
+    quote["id"] = quotes[-1]["id"] + 1
+    quotes.append(quote)
+    return quote, HTTPStatus.CREATED
 
 
 @app.route("/quotes/<int:id>")
