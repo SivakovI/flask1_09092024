@@ -96,6 +96,9 @@ def edit_quote(id):
     for key, value in new_data.items():
         if key not in quote:
             return f"Invalid key {key}", HTTPStatus.BAD_REQUEST
+        if key == "id":
+            return "Id is read-only", HTTPStatus.BAD_REQUEST
+
         quote[key] = value
 
     quotes[index] = quote
