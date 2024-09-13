@@ -77,7 +77,7 @@ def edit_quote(id):
     if "rating" in new_data and not validate_rating(new_data["rating"]):
         del new_data["rating"]
     if len(new_data) == 0:
-        return "No data to update", HTTPStatus.NO_CONTENT
+        return "No valid data to update", HTTPStatus.BAD_REQUEST
     query_parameters = " ,".join(f"{key} = ?" for key in new_data.keys())
     print(query_parameters)
     edit_quote_query = f"UPDATE quotes SET {query_parameters} WHERE id = ?"
