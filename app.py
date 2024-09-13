@@ -7,6 +7,15 @@ from storage.database import ReturnType, get_quote_by_id, query_db
 app = Flask(__name__)
 
 
+DEFAULT_RATING = 1
+MIN_RATING = 1
+MAX_RATING = 5
+
+
+def validate_rating(rating):
+    return MIN_RATING <= rating <= MAX_RATING
+
+
 @app.teardown_appcontext
 def close_connection(exception):
     db = getattr(g, "_database", None)
@@ -26,11 +35,14 @@ def get_quotes():
 @app.route("/quotes", methods=["POST"])
 def add_quote():
     quote = request.json
-    add_new_quote = "INSERT INTO quotes (author, text) VALUES (?, ?)"
+    add_new_quote = "INSERT INTO quotes (author, text, rating) VALUES (?, ?, ?)"
+
+    if "rating" not in quote or not validate_rating(quote["rating"]):
+        quote["rating"] = DEFAULT_RATING
 
     quote["id"] = query_db(
         add_new_quote,
-        [quote["author"], quote["text"]],
+        [quote["author"], quote["text"], quote["rating"]],
         return_tupe=ReturnType.LASTROWID,
     )
 
@@ -61,13 +73,19 @@ def get_quote(id):
 
 @app.route("/quotes/<int:id>", methods=["PUT"])
 def edit_quote(id):
-    query_parameters = " ,".join(f"{key} = ?" for key in request.json.keys())
+    new_data = request.json
+    if "rating" in new_data and not validate_rating(new_data["rating"]):
+        del new_data["rating"]
+    if len(new_data) == 0:
+        return "No data to update", HTTPStatus.NO_CONTENT
+    query_parameters = " ,".join(f"{key} = ?" for key in new_data.keys())
+    print(query_parameters)
     edit_quote_query = f"UPDATE quotes SET {query_parameters} WHERE id = ?"
 
     try:
         success = query_db(
             edit_quote_query,
-            [request.json[key] for key in request.json.keys()] + [id],
+            [new_data[key] for key in new_data.keys()] + [id],
             return_tupe=ReturnType.ROWCOUNT,
         )
         if not success:
