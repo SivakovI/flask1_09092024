@@ -51,7 +51,7 @@ def add_quote():
 
 @app.route("/quotes/filter")
 def filter_quotes():
-    query_parameters = " ,".join(f"{key} = ?" for key in request.args.keys())
+    query_parameters = " AND ".join(f"{key} = ?" for key in request.args.keys())
     query = f"SELECT * from quotes WHERE {query_parameters}"
     filtered_quotes = query_db(
         query,
