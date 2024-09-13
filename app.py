@@ -58,6 +58,8 @@ def filter_quotes():
         [request.args[key] for key in request.args.keys()],
         return_tupe=ReturnType.ALL,
     )
+    if not filtered_quotes:
+        return []
     return filtered_quotes
 
 
@@ -79,7 +81,6 @@ def edit_quote(id):
     if len(new_data) == 0:
         return "No valid data to update", HTTPStatus.BAD_REQUEST
     query_parameters = " ,".join(f"{key} = ?" for key in new_data.keys())
-    print(query_parameters)
     edit_quote_query = f"UPDATE quotes SET {query_parameters} WHERE id = ?"
 
     try:
