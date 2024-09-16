@@ -1,114 +1,107 @@
 from http import HTTPStatus
 
-from flask import Flask, g, request
+from flask import Flask, request
+from sqlalchemy.exc import InvalidRequestError
 
-from storage.database import ReturnType, get_quote_by_id, query_db
+from storage.database import (
+    DEFAULT_RATING,
+    QuoteModel,
+    db,
+    get_quote_by_id,
+    path_to_db,
+    populate_db,
+    validate_rating,
+)
 
 app = Flask(__name__)
-
-
-DEFAULT_RATING = 1
-MIN_RATING = 1
-MAX_RATING = 5
-
-
-def validate_rating(rating):
-    return MIN_RATING <= rating <= MAX_RATING
-
-
-@app.teardown_appcontext
-def close_connection(exception):
-    db = getattr(g, "_database", None)
-    if db is not None:
-        db.commit()
-        db.close()
+app.config["SQLALCHEMY_DATABASE_URI"] = path_to_db
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 
 @app.route("/quotes")
 def get_quotes():
-    select_quotes = "SELECT * from quotes"
-    quotes = query_db(select_quotes, return_tupe=ReturnType.ALL)
-
-    return quotes
+    quotes = db.session.query(QuoteModel).all()
+    return [quote.to_dict() for quote in quotes]
 
 
 @app.route("/quotes", methods=["POST"])
 def add_quote():
-    quote = request.json
-    add_new_quote = "INSERT INTO quotes (author, text, rating) VALUES (?, ?, ?)"
+    data = request.json
 
-    if "rating" not in quote or not validate_rating(quote["rating"]):
-        quote["rating"] = DEFAULT_RATING
+    if "rating" not in data or not validate_rating(data["rating"]):
+        data["rating"] = DEFAULT_RATING
 
-    quote["id"] = query_db(
-        add_new_quote,
-        [quote["author"], quote["text"], quote["rating"]],
-        return_tupe=ReturnType.LASTROWID,
-    )
+    try:
+        quote = QuoteModel(**data)
+        db.session.add(quote)
+        db.session.commit()
+    except TypeError:
+        return (
+            (
+                "Invalid data. Required: author, text, rating (optional). "
+                f"Received: {", ".join(data.keys())}"
+            ),
+            HTTPStatus.BAD_REQUEST,
+        )
 
-    return quote, HTTPStatus.CREATED
+    return quote.to_dict(), HTTPStatus.CREATED
 
 
 @app.route("/quotes/filter")
 def filter_quotes():
-    query_parameters = " AND ".join(f"{key} = ?" for key in request.args.keys())
-    query = f"SELECT * from quotes WHERE {query_parameters}"
-    filtered_quotes = query_db(
-        query,
-        [request.args[key] for key in request.args.keys()],
-        return_tupe=ReturnType.ALL,
-    )
-    if not filtered_quotes:
-        return []
-    return filtered_quotes
+    try:
+        quotes = db.session.query(QuoteModel).filter_by(**request.args).all()
+    except InvalidRequestError:
+        return (
+            (
+                "Invalid data. Possible keys: author, text, rating. "
+                f"Received: {", ".join(request.args.keys())}"
+            ),
+            HTTPStatus.BAD_REQUEST,
+        )
+
+    return [quote.to_dict() for quote in quotes]
 
 
 @app.route("/quotes/<int:id>")
 def get_quote(id):
-    quote = get_quote_by_id(id)
-
-    if quote is None:
-        return f"Quote with id {id} not found", HTTPStatus.NOT_FOUND
-
-    return quote
+    return get_quote_by_id(id).to_dict()
 
 
 @app.route("/quotes/<int:id>", methods=["PUT"])
 def edit_quote(id):
-    new_data = request.json
-    if "rating" in new_data and not validate_rating(new_data["rating"]):
-        del new_data["rating"]
-    if len(new_data) == 0:
+    quote = get_quote_by_id(id)
+
+    data = request.json
+    if "rating" in data and not validate_rating(data["rating"]):
+        data.pop("rating")
+    if len(data) == 0:
         return "No valid data to update", HTTPStatus.BAD_REQUEST
-    query_parameters = " ,".join(f"{key} = ?" for key in new_data.keys())
-    edit_quote_query = f"UPDATE quotes SET {query_parameters} WHERE id = ?"
 
     try:
-        success = query_db(
-            edit_quote_query,
-            [new_data[key] for key in new_data.keys()] + [id],
-            return_tupe=ReturnType.ROWCOUNT,
-        )
-        if not success:
-            return f"Quote with id {id} not found", HTTPStatus.NOT_FOUND
-
-        return get_quote_by_id(id)
-
+        for key, value in data.items():
+            assert hasattr(
+                quote, key
+            ), f"Invalid key: {key}. Valid: author, text, rating"
+            setattr(quote, key, value)
+        db.session.commit()
+        return quote.to_dict()
     except Exception as e:
         return str(e), HTTPStatus.BAD_REQUEST
 
 
 @app.route("/quotes/<int:id>", methods=["DELETE"])
 def delete_quote(id):
-    delete_quote_query = "DELETE FROM quotes WHERE id = ?"
-
-    success = query_db(delete_quote_query, (id,), return_tupe=ReturnType.ROWCOUNT)
-
-    if not success:
-        return f"Quote with id {id} not found", HTTPStatus.NOT_FOUND
-
+    quote = get_quote_by_id(id)
+    db.session.delete(quote)
     return f"Quote with id {id} deleted"
 
 
 if __name__ == "__main__":
+    db.init_app(app)
+
+    with app.app_context():
+        db.create_all()
+        populate_db()
+
     app.run(debug=True)
