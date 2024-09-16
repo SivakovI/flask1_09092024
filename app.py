@@ -63,6 +63,11 @@ def filter_quotes():
     return [quote.to_dict() for quote in quotes]
 
 
+@app.route("/quotes/count")
+def count_quotes():
+    return {"count": db.session.query(QuoteModel).count()}
+
+
 @app.route("/quotes/<int:id>")
 def get_quote(id):
     return get_quote_by_id(id).to_dict()
