@@ -1,4 +1,5 @@
 from http import HTTPStatus
+from sys import argv
 
 from flask import Flask, request
 from sqlalchemy.exc import InvalidRequestError
@@ -105,8 +106,9 @@ def delete_quote(id):
 if __name__ == "__main__":
     db.init_app(app)
 
-    with app.app_context():
-        db.create_all()
-        populate_db()
+    if len(argv) > 1 and argv[1] == "create_db":
+        with app.app_context():
+            db.create_all()
+            populate_db()
 
     app.run(debug=True)
