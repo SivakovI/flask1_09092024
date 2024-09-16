@@ -31,7 +31,7 @@ def get_author(id):
     return author.to_dict()
 
 
-@app.route("/authors/<int:id>", methods=["POST"])
+@app.route("/authors/", methods=["POST"])
 def create_author():
     data = request.json
     author = AuthorModel(**data)
