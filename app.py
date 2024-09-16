@@ -100,6 +100,7 @@ def edit_quote(id):
 def delete_quote(id):
     quote = get_quote_by_id(id)
     db.session.delete(quote)
+    db.session.commit()
     return f"Quote with id {id} deleted"
 
 
