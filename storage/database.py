@@ -1,8 +1,6 @@
-import sqlite3
 from enum import Enum
 from pathlib import Path
 
-from flask import g
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import CheckConstraint, Integer, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, validates
@@ -64,33 +62,6 @@ class ReturnType(Enum):
 
 BASE_DIR = Path(__file__).parent.parent
 path_to_db = f"sqlite:///{BASE_DIR / "store.db"}"
-
-
-def make_dicts(cursor, row):
-    return dict((cursor.description[idx][0], value) for idx, value in enumerate(row))
-
-
-def get_db():
-    db = getattr(g, "_database", None)
-    if db is None:
-        db = g._database = sqlite3.connect(path_to_db)
-        db.row_factory = make_dicts
-    return db
-
-
-def query_db(query, args=(), return_tupe: ReturnType = ReturnType.ALL):
-    cur = get_db().execute(query, args)
-    rv = cur.fetchall()
-    cur.close()
-    match return_tupe:
-        case ReturnType.ONE:
-            return rv[0] if rv else None
-        case ReturnType.ALL:
-            return rv if rv else None
-        case ReturnType.LASTROWID:
-            return cur.lastrowid
-        case ReturnType.ROWCOUNT:
-            return cur.rowcount
 
 
 def get_quote_by_id(id):
