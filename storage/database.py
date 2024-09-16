@@ -2,8 +2,14 @@ from enum import Enum
 from pathlib import Path
 
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import CheckConstraint, Integer, String
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, validates
+from sqlalchemy import CheckConstraint, ForeignKey, Integer, String
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    mapped_column,
+    relationship,
+    validates,
+)
 
 MIN_RATING = 1
 MAX_RATING = 5
@@ -21,36 +27,40 @@ class Base(DeclarativeBase):
 db = SQLAlchemy(model_class=Base)
 
 
+class AuthorModel(db.Model):
+    __tablename__ = "authors"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(32), unique=True)
+    quotes: Mapped[list["QuoteModel"]] = relationship(
+        back_populates="author", lazy="dynamic"
+    )
+
+    def __init__(self, name) -> None:
+        self.name = name
+
+    def to_dict(self):
+        return {"id": self.id, "name": self.name}
+
+
 class QuoteModel(db.Model):
     __tablename__ = "quotes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    author: Mapped[str] = mapped_column(String(32))
+    author_id: Mapped[str] = mapped_column(ForeignKey("authors.id"))
+    author: Mapped["AuthorModel"] = relationship(back_populates="quotes")
     text: Mapped[str] = mapped_column(String(255))
-    rating: Mapped[int] = mapped_column(
-        Integer(),
-        CheckConstraint(f"rating >= {MIN_RATING} AND rating <= {MAX_RATING}"),
-        default=DEFAULT_RATING,
-    )
 
-    def __init__(self, author, text, rating) -> None:
+    def __init__(self, author, text) -> None:
         self.author = author
         self.text = text
-        self.rating = rating
 
     def to_dict(self):
         return {
             "id": self.id,
-            "author": self.author,
+            "author": self.author.to_dict(),
             "text": self.text,
-            "rating": self.rating,
         }
-
-    @validates("rating")
-    def orm_validate_rating(self, _, rating):
-        if validate_rating(rating):
-            return rating
-        raise ValueError(f"Rating must be between {MIN_RATING} and {MAX_RATING}")
 
 
 class ReturnType(Enum):
@@ -68,31 +78,36 @@ def get_quote_by_id(id):
     return db.get_or_404(QuoteModel, id, description=f"Quote with id {id} not found")
 
 
+def get_author_by_id(id):
+    return db.get_or_404(AuthorModel, id, description=f"Author with id {id} not found")
+
+
 def populate_db():
-    if db.session.query(QuoteModel).count() > 0:
-        return
+    # if db.session.query(QuoteModel).count() > 0:
+    #     return
+
+    author = AuthorModel(name="Говард Лавкрафт")
+    db.session.add(author)
+    db.session.commit()
 
     quotes = [
         QuoteModel(
-            "Говард Лавкрафт",
+            author,
             (
                 "Мы живём на тихом островке невежества посреди "
                 "темного моря бесконечности, и нам вовсе не следует плавать на далекие "
                 "расстояния."
             ),
-            5,
         ),
         QuoteModel(
-            "Говард Лавкрафт",
+            author,
             (
                 "Человек может играть силами природы лишь до "
                 "определенных пределов; то, что вы создали, обернется против вас."
             ),
-            5,
         ),
     ]
 
     for quote in quotes:
         db.session.add(quote)
-
     db.session.commit()
