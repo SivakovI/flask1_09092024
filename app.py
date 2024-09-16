@@ -58,7 +58,7 @@ def add_quote():
         return (
             (
                 "Invalid data. Required: author, text, rating (optional). "
-                f"Received: {", ".join(data.keys())}"
+                f"Received: {', '.join(data.keys())}"
             ),
             HTTPStatus.BAD_REQUEST,
         )
