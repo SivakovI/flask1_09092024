@@ -8,6 +8,7 @@ from sqlalchemy.exc import InvalidRequestError
 from storage.database import (
     DEFAULT_RATING,
     QuoteModel,
+    AuthorModel,
     db,
     get_quote_by_id,
     get_author_by_id,
@@ -28,6 +29,15 @@ migrate = Migrate(app, db)
 def get_author(id):
     author = get_author_by_id(id)
     return author.to_dict()
+
+
+@app.route("/authors/<int:id>", methods=["POST"])
+def create_author():
+    data = request.json
+    author = AuthorModel(**data)
+    db.session.add(author)
+    db.session.commit()
+    return author.to_dict(), HTTPStatus.CREATED
 
 
 @app.route("/authors/<int:id>/quotes")
