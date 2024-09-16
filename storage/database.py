@@ -71,7 +71,7 @@ class ReturnType(Enum):
 
 
 BASE_DIR = Path(__file__).parent.parent
-path_to_db = f"sqlite:///{BASE_DIR / "store.db"}"
+path_to_db = f"sqlite:///{BASE_DIR / 'store.db'}"
 
 
 def get_quote_by_id(id):
